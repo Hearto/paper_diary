@@ -44,10 +44,10 @@ Autopilot分为几个不同的组件，如下图：
 
 ## **LOW-LEVEL服务** ##
 
-1. **filesync service：**广泛应用在Autopilot和Application，用于文件同步，确保本地磁盘文件的正确性。filesync既可以作为client从远程服务器获取文件，也可以作为server向其他client提供这种服务。自己实现filesync的优势在于拥塞控制，避免电脑或者交互机网卡异常超载。
+1. **filesync service：**广泛应用在Autopilot和Application，用于文件同步，确保本地磁盘文件的正确性。filesync既可以作为client从远程服务器获取文件，也可以作为server向其他client提供这种服务。自己实现filesync的优势在于拥塞控制，避免电脑或者交换机网卡异常超载。
 2. **application manager:**用于保证proccess的正常运行。每一个application process使用一个独立目录保存process所需的binaries、共享库、配置文件以及启动脚本。application manager根据这些配置信息确保process的正常运行。
 3. **Provisioning Service**:周期性地扫描网络，发现有新的机器加入时，向Device Manager发送请求获取该机器运行所需的系统镜像，然后使用计算机的management接口完成系统的安装、启动和burn-in测试，这几个步骤完成后通知Device Manager。Provisioning Service使用几台计算机作冗余，通过相应的操作从这些机器中选出一个leader，Provisioning Service所需的信息在leader启动时从Device Manager获得。
-4. **machine types**： Device Manager database中存储着集群中的每一个computer对应的machine type。computer与machine types的映射目前是手动静态配置的。Autopilot 本身不负责迁移或者负载均衡，而是applications根据machine types自动分发任务实现自身的负载均衡。从deployment角度来讲，machine types之间的差别主要体现在配置文件和application binaries，而通常不依赖硬件配置。
+4. **machine types**： Device Manager database中存储着集群中的每一个computer对应的machine type。computer与machine types的映射目前是手动静态配置的。Autopilot 本身不负责迁移或者负载均衡，而是applications根据machine types自动分发任务实现自身的负载均衡。从deployment角度来讲，machine types之间的差别主要体现在配置文件和application binaries，通常不依赖于硬件配置。
 5. **configuration manifest**：存储在Device Manager database，用于描述一个文件集合。每个节点可以一次存储多个manifests，但是只能有一个处于active状态，application manager只运行处于acitve manifests里面的process。这样新版本的applications可以pre-load,而处于非active状态，同样也方便新版本的回滚。Device Manager中记录着不同type的computer可以运行的程序manifests。
 6. **Deployment Service**：集群中的每台计算机周期性地查询Device Manager database以获得manifests信息。Deployment Service相当于一些弱一致副本的集合，里面存储着这些manifest对应程序、配置以及数据等。如果manifests缺失，则随机从Deployment Service副本中挑选一个。Device Manager对manifests有着最高的控制权，它始终保存着最新的manifests信息。
 7. **deployment new version：**集群中的每一种machine type维系着一个active manifest，因此相同machine type的机群运行着相同的application binaries，具有相同的配置。在准备部署一个新版本时，
@@ -136,7 +136,7 @@ Autopilot提供了一种简单的故障检测和恢复的机制，它的failure 
 ## 全文概览 ##
 
 ## Abstract & Introduction & Target Environment##
-Mesos计算框架一个集群管理器，提供了有效的、跨分布式应用或框架的资源隔离和共享，可以运行Hadoop、MPI等framework。Mesos使用resource offer决定每一个framwork的资源分配，framework自身可以有选择地使用分配到的资源。
+Mesos计算框架一个集群管理器，提供了有效的、跨分布式应用或框架的资源隔离和共享，可以运行Hadoop、MPI等framework。Mesos使用resource offer完成对每一个framwork的资源分配，framework自身可以有选择地使用或者不使用分配到的资源。
 
 **背景：**新的framework不断涌现，一个集群中可能会同时运行多种framework，但没有一种framework会适合所有的application。
 
@@ -169,7 +169,7 @@ to the frameworks.*
 
 - **Dominant Resource Fairness (DRF):**是一种根据dominant resource（占有量最多的资源）的fairness分配策略。例如：集群有100cpu和100gb，framwork F1每个task需要4cpu和1gb，F2每个task需要1cpu和8gb，则DRF分配给F1 20个task（80cpu和10gb），分配给F2 10个task（20cpu和80gb），这样使得F1的dominant resource（cpu）和F2的dominant resource（ram）所占有的资源在数量上相等。
 - **Supporting Long Tasks：**Mesos适合fine-grained（short Tasks）的环境，同样也有针对long tasks的处理措施。好一点的情况是：framwork本身能够标记task为short或者long，这样short task可以任意使用资源，而long task只能使用指定数量的资源；当framwork不标记task时，对于long task的**revocation**文中提到了两种机制：一种是要求资源分配模块提供guaranteed allocation（framework不会losing task）；另一种是资源分配模块根据framework的interest程度（通过API调用实现）决定对哪些task执行revocation操作。
-- **Isolation：**Mesos的隔离模块（isolation modules）主要使用linux containers。文中提到，Mesos将来可能会采用virtual machines代替containers；
+- **Isolation：**Mesos的隔离模块（isolation modules）主要使用linux containers。文中提到，Mesos将来可能会采用virtual machines代替linux containers；
 - **Resource Offers Scalable and Robust：**Mesos通过三种机制实现Resource Offers的高效和稳定：
 	+ 使用过滤（Filter）机制：允许framework只接收“剩余资源量大于L的 slave”或者“只接收node列表中的slave”；
 	+ 使用一种counts resources方法“刺激”frameworks快速响应；
@@ -179,7 +179,7 @@ to the frameworks.*
 ## Mesos Behavior ##
 文中第四章讲述了Mesos针对一种和多种任务（Homogeneous and Heterogeneous Tasks）、Elastic和Rigid两种Frameworks的运行情况。Mesos将资源分为required和preferred：required是Framework运行所必须的资源；preferred是Framework可以使用但不是必须的资源。
 
-1. **Elastic and Rigid Frameworks：elastic Framworks获得部分资源即可运行，而rigid Frameworks则需要获得它所需要的所有资源才能够运行。**文中4.2节计算了固定周期任务（constant durations task）和指数增长周期任务（exponential durations task）运行在elastic Framework和rigid Framework中的任务完成时间（job completion time）和系统利用率（system utilization）的理论结果。
+1. **Elastic and Rigid Frameworks：elastic Framworks获得部分资源即可运行，而rigid Frameworks则需要获得它所需要的所有资源才能够运行。**文中4.2节计算了固定周期任务（constant durations task）和周期线性增长任务（exponential durations task）运行在elastic Framework和rigid Framework中的任务完成时间（job completion time）和系统利用率（system utilization）的理论结果。
 2. **Placement Preferences:**Mesos采用了类似彩票调度（lottery scheduling）的资源分配策略，即根据frameworks的intended allocations的比例权重决定分配他们的preferred资源数量。
 3. **Homogeneous and Heterogeneous Tasks ：** *毫无疑问，Mesos总是给short task更多的优待。* Mesos使用一种**Framework Incentives**机制提升jobs的响应时间：
 	+ **short task优先：**short task所占资源少；任务异常时，short task更容易revocation；
@@ -268,7 +268,7 @@ Mesos由大约一万行C++代码实现，使用了C++的libprocess库；此外�
 
 1. 首先看看文章中指出以**Mesos**为代表的双层调度器（Two-level scheduler）存在的不足之处：
 	+  **framework scheduler是被动的，局限的：**各个框架调度器并不知道整个集群资源使用情况，只是被动的接收资源；
-	+  使用**all-or-nothing**性质的成组调度（**gang sheduling**）方式存在死锁的风险。
+	+  使用**all-or-nothing**性质的成组调度（**gang sheduling**）方式存在死锁的风险；
 	+  **使用悲观锁，并发粒度小：**在Mesos中，在任意一个时刻，Mesos资源调度器只会将所有资源推送给任意一个框架，等到该框架返回资源使用情况后，才能够将资源推动给其他框架，因此，Mesos资源调度器中实际上有一个全局锁，这大大限制了系统并发性。
 <br></br>
 2. 文中主要提及了三种调度器： 中央式调度器（Monolithic scheduler）、 双层调度器（Two-level scheduler）、共享状态调度器（Shared State Scheduler）。
